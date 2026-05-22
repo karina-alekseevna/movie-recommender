@@ -1,0 +1,34 @@
+# Окружение Python
+env/
+venv/
+.venv/
+*.pyc
+__pycache__/
+
+# Зависимости Python (если вы храните их в requirements.txt)
+# Лучше закоммитить requirements.txt, а не саму папку с пакетами
+
+# Node / React
+node_modules/
+frontend/build/
+frontend/dist/
+
+# Переменные окружения
+.env
+.env.local
+.env.production
+
+# Файлы IDE
+.vscode/
+.idea/
+
+# Данные – если не хотите выкладывать датасеты
+data/
+# Если какие-то файлы всё же нужны, раскомментируйте и добавьте:
+# !data/small_sample.csv
+
+# Логи
+*.log
+
+# Системные файлы Mac
+.DS_Store
