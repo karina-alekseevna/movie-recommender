@@ -1,8 +1,6 @@
-# backend/config.py
 import os
 from dotenv import load_dotenv
 
-# Корневая папка проекта (на уровень выше backend)
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOTENV_PATH = os.path.join(ROOT_DIR, '.env')
 load_dotenv(DOTENV_PATH)
