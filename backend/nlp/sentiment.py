@@ -81,7 +81,6 @@ def _parse_llm_json(content: str) -> Optional[dict]:
 
 
 def _parse_llm_json_array(content: str, expected_count: int) -> Optional[List[dict]]:
-    """Парсит массив JSON-результатов из ответа LLM."""
     content = re.sub(r'```(?:json)?\s*', '', content).strip()
 
     try:
@@ -108,7 +107,6 @@ def _parse_llm_json_array(content: str, expected_count: int) -> Optional[List[di
 
 
 def _validate_sentiment_dict(data: dict) -> Optional[dict]:
-    """Валидирует и нормализует словарь с результатом."""
     if not isinstance(data, dict):
         return None
 
@@ -141,7 +139,6 @@ def _validate_sentiment_dict(data: dict) -> Optional[dict]:
     }
 
 class LLMClient:
-    """Базовый класс для LLM-клиентов."""
 
     def query(self, text: str) -> Optional[dict]:
         raise NotImplementedError
@@ -361,10 +358,6 @@ class GigaChatClient(LLMClient):
         return _parse_llm_json(content)
 
 class SemanticFallback:
-    """
-    Семантический анализ через эмбеддинги — используется
-    когда LLM недоступна.
-    """
 
     def __init__(self):
         self._initialized = False
@@ -478,13 +471,11 @@ class SemanticFallback:
 
     @staticmethod
     def _top_k_similarity(vec: np.ndarray, ref_vecs: np.ndarray, k: int = 3) -> float:
-        """Средняя косинусная близость к top-k ближайшим эталонам."""
         sims = ref_vecs @ vec
         top_k = np.sort(sims)[-k:]
         return float(np.mean(top_k))
 
     def analyze_batch(self, texts: List[str]) -> List[SentimentResult]:
-        """Батч-анализ через эмбеддинги — эффективнее чем по одному."""
         if not texts:
             return []
 
@@ -557,7 +548,6 @@ class SemanticFallback:
         return results
 
 class SentimentCache:
-    """LRU-кэш с нормализованными ключами."""
 
     def __init__(self, max_size: int = 3000):
         self._cache: OrderedDict[str, SentimentResult] = OrderedDict()
@@ -565,7 +555,6 @@ class SentimentCache:
 
     @staticmethod
     def _key(text: str) -> str:
-        """Хэш нормализованного текста — экономит память."""
         normalized = ' '.join(text.lower().split())[:500]
         return hashlib.md5(normalized.encode('utf-8')).hexdigest()
 
@@ -674,12 +663,6 @@ class SentimentAnalyzer:
         )
 
     def analyze_batch(self, texts: List[str]) -> List[SentimentResult]:
-        """
-        Пакетный анализ:
-        1. Проверяем кэш для всех текстов
-        2. Некэшированные отправляем в LLM батчем (если поддерживается)
-        3. Оставшиеся — через фоллбэк батчем
-        """
         if not texts:
             return []
 

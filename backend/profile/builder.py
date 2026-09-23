@@ -17,39 +17,14 @@ class EntityPreferenceUpdate:
 
 
 class ProfileBuilder:
-    """
-    Логика обновления профиля:
-
-    1. ПРЯМОЕ УПОМИНАНИЕ (direct mention):
-       Если сущность найдена в сегменте через exact/surname матч,
-       она получает полный вклад: segment_sentiment × match_score
-
-    2. MICRO-BONUS (ambient signal):
-       ВСЕ сущности фильма (актёры, режиссёры, сценаристы, жанры, keywords)
-       получают маленький бонус на основе ОБЩЕЙ тональности отзыва.
-       Это один раз за отзыв, не за каждый сегмент.
-       Коэффициент: overall_sentiment × MICRO_BONUS_FACTOR
-
-    Это позволяет:
-    - Точно учитывать, что пользователь хвалит/ругает конкретного актёра
-    - Постепенно накапливать предпочтения к жанрам, режиссёрам и т.д.
-      даже если пользователь не упоминает их по имени
-    """
-
-    # Множитель для micro-bonus (маленький, чтобы не забивал прямые упоминания)
     MICRO_BONUS_FACTOR = 0.05
 
-    # Минимальный |sentiment| для micro-bonus (не даём бонус за нейтральные отзывы)
     MICRO_BONUS_SENTIMENT_THRESHOLD = 0.15
 
     def __init__(self):
         self.supabase = get_supabase()
 
-    # ----------------------------------------------------------------
-    # Применение обновлений к БД
-    # ----------------------------------------------------------------
     def apply_entity_updates(self, user_id: str, updates: List[EntityPreferenceUpdate]):
-        """Применяет список обновлений к user_entity_preferences."""
         # Группируем по (тип, normalized)
         grouped: Dict[Tuple[str, str], EntityPreferenceUpdate] = {}
         for update in updates:
@@ -101,9 +76,6 @@ class ProfileBuilder:
                     'entity_embedding': update.entity_embedding.tolist(),
                 }).execute()
 
-    # ----------------------------------------------------------------
-    # Векторный профиль
-    # ----------------------------------------------------------------
     def _parse_embedding(self, val, dim: int = 384):
         if val is None:
             return np.zeros(dim, dtype=np.float32)
@@ -167,9 +139,6 @@ class ProfileBuilder:
                 'reviews_count': 1,
             }).execute()
 
-    # ----------------------------------------------------------------
-    # Главный метод
-    # ----------------------------------------------------------------
     def process_review(
         self,
         user_id: str,
@@ -179,18 +148,8 @@ class ProfileBuilder:
         overall_sentiment: float,
         all_movie_entities: List[Dict],
     ) -> Dict:
-        """
-        Обрабатывает отзыв и обновляет профиль пользователя.
-
-        Два канала обновления:
-        1. Direct mentions — из analyzed_segments
-        2. Micro-bonus — для ВСЕХ сущностей фильма
-        """
         updates: Dict[Tuple[str, str], EntityPreferenceUpdate] = {}
 
-        # ============================================================
-        # 1. DIRECT MENTIONS: сущности, найденные в конкретных сегментах
-        # ============================================================
         for seg in analyzed_segments:
             if seg.is_general or not seg.matched_entities:
                 continue
@@ -212,13 +171,8 @@ class ProfileBuilder:
                         entity_embedding=entity.entity_embedding,
                     )
 
-        # Запоминаем ключи прямых упоминаний (для логирования)
         direct_mention_keys = set(updates.keys())
 
-        # ============================================================
-        # 2. MICRO-BONUS: все сущности фильма получают маленький бонус
-        #    на основе общей тональности отзыва (один раз за отзыв)
-        # ============================================================
         if abs(overall_sentiment) >= self.MICRO_BONUS_SENTIMENT_THRESHOLD:
             micro_bonus = overall_sentiment * self.MICRO_BONUS_FACTOR
 
@@ -226,10 +180,8 @@ class ProfileBuilder:
                 key = (ent['entity_type'], ent['entity_normalized'])
 
                 if key in updates:
-                    # Добавляем micro-bonus к уже существующему direct mention
                     updates[key].score_delta += micro_bonus
                 else:
-                    # Создаём новое обновление только с micro-bonus
                     updates[key] = EntityPreferenceUpdate(
                         entity_type=ent['entity_type'],
                         entity_value=ent['entity_value'],
@@ -238,11 +190,9 @@ class ProfileBuilder:
                         entity_embedding=ent['embedding'],
                     )
 
-        # Применяем все обновления
         all_updates = list(updates.values())
         self.apply_entity_updates(user_id, all_updates)
 
-        # Обновляем векторный профиль
         self.update_vector_profile(user_id, movie_embedding, overall_sentiment)
 
         return {

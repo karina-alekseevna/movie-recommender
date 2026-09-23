@@ -15,8 +15,8 @@ class MatchedEntity:
     entity_type: str
     entity_value: str
     entity_normalized: str
-    match_method: str       # 'exact', 'surname', 'fuzzy_name'
-    match_score: float      # 0..1
+    match_method: str
+    match_score: float
     entity_embedding: np.ndarray = field(repr=False)
 
 
@@ -30,12 +30,7 @@ class AnalyzedSegment:
 
 
 class EntityMatcher:
-    """
-    Матчер сущностей — только точные и fuzzy-строковые совпадения.
-    Никакого семантического матчинга: он даёт слишком много false positives
-    для имён на разных языках.
-    """
-
+    
     # Минимальная длина фамилии для surname-матча
     MIN_SURNAME_LENGTH = 5
 
@@ -56,9 +51,6 @@ class EntityMatcher:
         self.supabase = get_supabase()
         self._entity_cache: Dict[int, List[Dict]] = {}
 
-    # ----------------------------------------------------------------
-    # Загрузка сущностей
-    # ----------------------------------------------------------------
     def get_movie_entities(self, movie_id: int) -> List[Dict]:
         """Получает все сущности фильма из БД (с кэшированием)."""
         if movie_id in self._entity_cache:
@@ -85,22 +77,14 @@ class EntityMatcher:
         self._entity_cache[movie_id] = entities
         return entities
 
-    # ----------------------------------------------------------------
-    # Вспомогательные методы
-    # ----------------------------------------------------------------
     @staticmethod
     def _extract_person_name(normalized: str) -> str:
-        """Достаёт имя персоны (до скобок)."""
         if '(' in normalized:
             return normalized.split('(')[0].strip()
         return normalized
 
     @staticmethod
     def _extract_character_names(entity_value: str) -> List[str]:
-        """
-        Извлекает имена персонажей из entity_value.
-        Формат: «Actor Name (Character Name (voice))»
-        """
         characters = []
         parts = re.findall(r'$([^)]+)$', entity_value)
         for part in parts:
@@ -111,26 +95,17 @@ class EntityMatcher:
 
     @staticmethod
     def _word_boundary_search(text: str, phrase: str) -> bool:
-        """Проверяет наличие фразы как целого слова/словосочетания."""
         pattern = r'(?<![а-яёa-z])' + re.escape(phrase) + r'(?![а-яёa-z])'
         return bool(re.search(pattern, text, re.IGNORECASE))
 
     @staticmethod
     def _normalize_for_fuzzy(name: str) -> str:
-        """Убирает ё→е, лишние пробелы, приводит к нижнему регистру."""
         name = name.lower().strip()
         name = name.replace('ё', 'е')
         name = re.sub(r'\s+', ' ', name)
         return name
 
-    # ----------------------------------------------------------------
-    # Генерация вариантов имени для поиска
-    # ----------------------------------------------------------------
     def _build_search_variants(self, entity: Dict) -> List[Tuple[str, str, float]]:
-        """
-        Возвращает список (variant_name, match_method, match_score)
-        для данной сущности.
-        """
         entity_type = entity['entity_type']
         normalized = entity['entity_normalized']
         variants = []
@@ -141,29 +116,24 @@ class EntityMatcher:
             )
 
             if person_name:
-                # Полное имя — лучший матч
                 variants.append((person_name, 'exact', 1.0))
 
-                # Фамилия (последнее слово), если достаточно длинная
                 parts = person_name.split()
                 if len(parts) >= 2:
                     surname = parts[-1]
                     if len(surname) >= self.MIN_SURNAME_LENGTH:
                         variants.append((surname, 'surname', 0.85))
 
-                    # Имя (первое слово), если достаточно длинное
                     first_name = parts[0]
                     if len(first_name) >= self.MIN_SURNAME_LENGTH:
                         variants.append((first_name, 'surname', 0.7))
 
-            # Имена персонажей (только для актёров)
             if entity_type == 'actor':
                 for char_name in self._extract_character_names(entity['entity_value']):
                     char_normalized = self._normalize_for_fuzzy(char_name)
                     if char_normalized:
                         variants.append((char_normalized, 'exact', 1.0))
 
-                        # Части имени персонажа (если многословное)
                         char_parts = char_normalized.split()
                         if len(char_parts) >= 2:
                             for cp in char_parts:
@@ -172,14 +142,8 @@ class EntityMatcher:
 
         return variants
 
-    # ----------------------------------------------------------------
-    # Точный + fuzzy-строковый матчинг персон
-    # ----------------------------------------------------------------
     def _match_persons(self, segment_text: str,
                        person_entities: List[Dict]) -> List[MatchedEntity]:
-        """
-        Ищет персон в тексте сегмента через точное и fuzzy-строковое совпадение.
-        """
         text_normalized = self._normalize_for_fuzzy(segment_text)
         matches = []
 
@@ -189,10 +153,7 @@ class EntityMatcher:
 
             for variant_name, method, score in variants:
                 if self._word_boundary_search(text_normalized, variant_name):
-                    # Дополнительная проверка для коротких фамилий:
-                    # не матчим если это часть другого слова
                     if method == 'surname' and len(variant_name) < 6:
-                        # Проверяем что это не часть обычного русского слова
                         idx = text_normalized.find(variant_name)
                         if idx == -1:
                             continue
@@ -218,12 +179,8 @@ class EntityMatcher:
                 best[key] = m
         return list(best.values())
 
-    # ----------------------------------------------------------------
-    # Точный матчинг keywords
-    # ----------------------------------------------------------------
     def _match_keywords(self, segment_text: str,
                         keyword_entities: List[Dict]) -> List[MatchedEntity]:
-        """Точный матчинг ключевых слов."""
         text_normalized = self._normalize_for_fuzzy(segment_text)
         matches = []
 
@@ -256,19 +213,11 @@ class EntityMatcher:
                 best[key] = m
         return list(best.values())
 
-    # ----------------------------------------------------------------
-    # Главный метод: матчинг одного сегмента
-    # ----------------------------------------------------------------
     def match_segment(
         self,
         segment: ReviewSegment,
         movie_entities: List[Dict]
     ) -> List[MatchedEntity]:
-        """
-        Матчит сущности к сегменту ТОЛЬКО через точное/строковое совпадение.
-        Никакого семантического матчинга.
-        """
-        # Отделяем жанры — они не матчатся к сегментам
         non_genre = [e for e in movie_entities if e['entity_type'] != 'genre']
         person_entities = [
             e for e in non_genre
@@ -284,9 +233,6 @@ class EntityMatcher:
 
         return person_matches + keyword_matches
 
-    # ----------------------------------------------------------------
-    # Анализ всего отзыва
-    # ----------------------------------------------------------------
     def analyze_review(
         self,
         segments: List[ReviewSegment],

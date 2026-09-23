@@ -18,9 +18,6 @@ class RecommendationEngine:
         self.supabase = get_supabase()
 
     def get_liked_genres(self, user_id: str) -> List[Tuple[str, float]]:
-        """
-        Извлекает ВСЕ жанры с положительным весом (даже 0.001).
-        """
         prefs = self.supabase.table('user_entity_preferences').select(
             'entity_normalized, weight'
         ).eq('user_id', user_id).eq('entity_type', 'genre').gt(
@@ -30,7 +27,6 @@ class RecommendationEngine:
         return [(p['entity_normalized'], p['weight']) for p in (prefs.data or [])]
 
     def get_disliked_genres(self, user_id: str) -> Set[str]:
-        """Жанры, которые не нравятся (вес < 0) – теперь любые отрицательные."""
         prefs = self.supabase.table('user_entity_preferences').select(
             'entity_normalized'
         ).eq('user_id', user_id).eq('entity_type', 'genre').lt(
@@ -41,9 +37,6 @@ class RecommendationEngine:
     def get_genre_recommendations(
         self, user_id: str, limit: int = 100, exclude_movie_ids: List[int] = None
     ) -> List[Tuple[int, float]]:
-        """
-        Рекомендации на основе жанров – теперь учитываются любые веса жанров.
-        """
         liked_genres = self.get_liked_genres(user_id)
         disliked_genres = self.get_disliked_genres(user_id)
 
@@ -83,11 +76,6 @@ class RecommendationEngine:
     def get_entity_recommendations(
         self, user_id: str, limit: int = 30, exclude_movie_ids: List[int] = None
     ) -> List[Tuple[int, float]]:
-        """
-        Учитываются ВСЕ положительные и отрицательные сущности,
-        без порогов и без ограничения количества.
-        """
-        # Положительные сущности – теперь все, у кого weight > 0
         pos_prefs = self.supabase.table('user_entity_preferences').select(
             'entity_type, entity_normalized, weight, mention_count'
         ).eq('user_id', user_id).gt('weight', 0).execute()
@@ -133,7 +121,6 @@ class RecommendationEngine:
     def get_vector_recommendations(
         self, user_id: str, limit: int = 30, exclude_movie_ids: List[int] = None
     ) -> List[Tuple[int, float]]:
-        """Векторные рекомендации без изменений."""
         profile = self.supabase.table('user_vector_profiles').select('*').eq(
             'user_id', user_id
         ).execute()
@@ -181,7 +168,6 @@ class RecommendationEngine:
         return recommendations[:limit]
 
     def get_recommendations(self, user_id: str, limit: int = 20) -> List[Dict]:
-        """Комбинирует все три источника с нормализацией."""
         reviewed = self.supabase.table('reviews').select('movie_id').eq(
             'user_id', user_id
         ).execute()

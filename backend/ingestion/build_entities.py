@@ -6,13 +6,7 @@ import numpy as np
 
 
 def build_movie_entities(movie: Dict) -> List[Dict]:
-    """
-    Из одного фильма извлекает все сущности и создаёт для каждой вектор.
     
-    Сущности фильма — это его «семантический отпечаток».
-    Каждая сущность (жанр, ключевое слово, актёр, режиссёр) 
-    получает свой вектор через SentenceTransformer.
-    """
     entities = []
     
     # Жанры
@@ -66,16 +60,7 @@ def build_movie_entities(movie: Dict) -> List[Dict]:
 
 
 def build_movie_embedding(movie: Dict) -> np.ndarray:
-    """
-    Создаёт единый вектор фильма из комбинации его текстовых данных.
     
-    Стратегия: объединяем наиболее информативные текстовые поля
-    в один «документ» и кодируем его целиком.
-    
-    Почему так: SentenceTransformer понимает контекст,
-    поэтому "драма о дружбе в тюрьме" даст более осмысленный вектор,
-    чем среднее от отдельных слов.
-    """
     parts = []
     
     # Название
@@ -104,8 +89,6 @@ def build_movie_embedding(movie: Dict) -> np.ndarray:
     
     combined_text = '. '.join(parts)
     
-    # Sentence Transformer имеет лимит ~256 токенов,
-    # обрезаем если слишком длинный текст
     if len(combined_text) > 1000:
         combined_text = combined_text[:1000]
     

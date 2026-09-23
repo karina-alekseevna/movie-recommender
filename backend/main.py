@@ -1,3 +1,4 @@
+# backend/main.py
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -79,9 +80,11 @@ def compute_overall_sentiment(analyzed_segments) -> tuple:
         text_len = max(len(seg.segment.text), 1)
         weight = text_len
 
+        # Сегменты с высокой уверенностью дают больше вклада
         if seg.sentiment.confidence > 0.7:
             weight *= 1.2
 
+        # Сегменты, в которых были найдены сущности, также немного весомее
         if seg.matched_entities:
             weight *= 1.1
 
@@ -93,6 +96,7 @@ def compute_overall_sentiment(analyzed_segments) -> tuple:
 
     overall_score = weighted_sum / total_weight
 
+    # Определяем лейбл
     if overall_score > 0.15:
         label = 'positive'
     elif overall_score < -0.15:
@@ -193,28 +197,34 @@ async def submit_review(request: ReviewRequest):
         emb_val = json.loads(emb_val)
     movie_embedding = np.array(emb_val, dtype=np.float32)
 
+    # Сегментация
     segments = segment_review(request.review_text)
     if not segments:
         raise HTTPException(status_code=400, detail="Отзыв слишком короткий")
 
+    # Анализ тональности по сегментам
     sentiments = sentiment_analyzer.analyze_batch([s.text for s in segments])
 
+    # Сопоставление сущностей
     analyzed_segments = entity_matcher.analyze_review(
         segments, sentiments, request.movie_id
     )
     all_movie_entities = entity_matcher.get_movie_entities(request.movie_id)
 
+    # Общая тональность с учётом всех сигналов
     overall_sentiment, overall_label = compute_overall_sentiment(analyzed_segments)
 
+    # Обновление профиля (теперь с корректной работой с сущностями)
     profile_builder.process_review(
         user_id=request.user_id,
         movie_id=request.movie_id,
         analyzed_segments=analyzed_segments,
         movie_embedding=movie_embedding,
         overall_sentiment=overall_sentiment,
-        all_movie_entities=all_movie_entities 
+        all_movie_entities=all_movie_entities  # <-- новый параметр
     )
 
+    # Сохранение отзыва
     segments_data = [
         {
             'text': seg.segment.text,

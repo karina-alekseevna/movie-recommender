@@ -12,7 +12,6 @@ import numpy as np
 
 
 async def ingest_all_movies(csv_path: str = 'data/movies.csv'):
-    """Полный пайплайн загрузки фильмов в БД"""
     
     print("1. Загрузка фильмов из CSV...")
     movies = load_movies_from_csv(csv_path)

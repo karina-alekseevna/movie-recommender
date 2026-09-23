@@ -8,8 +8,6 @@ const SentimentBadge = ({ score }) => {
   return <span className={`sentiment-badge ${cls}`}>{label} ({score.toFixed(2)})</span>;
 };
 
-// Компоненты EntityTag и GeneralBadge больше не нужны в превью
-
 export default function ReviewForm({ movieId, userId, onSuccess }) {
   const [text, setText] = useState('');
   const [preview, setPreview] = useState(null);
