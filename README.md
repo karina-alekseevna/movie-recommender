@@ -106,13 +106,13 @@ npm start
 
 ### 7. Демонстрация
 
-Каталог фильмов
+#### Каталог фильмов
 <img width="974" height="462" alt="image" src="https://github.com/user-attachments/assets/7981a7df-bf01-49ea-8791-5ff306a68a58" />
 
-Профиль пользователя
+#### Профиль пользователя
 <img width="974" height="462" alt="image" src="https://github.com/user-attachments/assets/0fdbb01c-dd53-496b-8fa4-239f893ae9a2" />
 
-Результат обработки отзыва
+#### Результат обработки отзыва
 <img width="974" height="461" alt="image" src="https://github.com/user-attachments/assets/93a37e6c-549e-40bb-8e43-2afbc12e67c3" />
 
 ## Контакты
